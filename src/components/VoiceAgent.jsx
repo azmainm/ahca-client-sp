@@ -1,7 +1,7 @@
 'use client';
 
 import { useState, useEffect, useRef } from 'react';
-import { RealtimeAgent, RealtimeSession } from '@openai/agents-realtime';
+import { RealtimeAgent, RealtimeSession, tool } from '@openai/agents-realtime';
 
 const VoiceAgent = () => {
   const [isConnected, setIsConnected] = useState(false);
@@ -9,22 +9,100 @@ const VoiceAgent = () => {
   const sessionRef = useRef(null);
   const agentRef = useRef(null);
 
-  // Initialize the agent
-  useEffect(() => {
-    agentRef.current = new RealtimeAgent({
-      name: 'AHCA Assistant',
-      instructions: `You are a helpful voice assistant for Sherpaprompt After Hours Call Agent. 
-      Your role is to:
-      1. Greet callers warmly and professionally
-      2. Ask for their name, email, and the nature of their inquiry
-      3. Provide assistance with general fencing (home service/construction) questions
-      4. Help schedule appointments when requested
-      5. Collect emergency information if the situation is urgent
-      6. Always maintain a caring and professional tone
+// Initialize the agent
+useEffect(() => {
+    // Define the knowledge search tool using the official tool() function
+    const knowledgeSearchTool = tool({
+      name: 'knowledge_search',
+      description: 'Search the company knowledge base for information about fencing services, pricing, materials, company policies, etc.',
+      parameters: {
+        type: 'object',
+        properties: {
+          query: {
+            type: 'string',
+            description: 'The search query based on what the customer is asking about'
+          }
+        },
+        required: ['query']
+      }
+    }, async ({ query }) => {
+        try {
+          console.log('Knowledge search called with query:', query);
+          console.log('API URL:', process.env.NEXT_PUBLIC_API_URL);
+          
+          // Call our backend API to perform the knowledge search
+          const apiUrl = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3001';
+          const response = await fetch(`${apiUrl}/api/voice-tools/search-knowledge`, {
+            method: 'POST',
+            headers: {
+              'Content-Type': 'application/json',
+            },
+            body: JSON.stringify({ query }),
+          });
       
-      Keep responses concise and clear. Ask follow-up questions to better understand the caller's needs.`,
-    });
+          console.log('API Response status:', response.status);
+      
+          if (!response.ok) {
+            const errorText = await response.text();
+            console.error('API Error response:', errorText);
+            throw new Error(`HTTP error! status: ${response.status}, message: ${errorText}`);
+          }
+      
+          const result = await response.json();
+          console.log('API Response data:', result);
+          
+          // Return the result in the format expected by the Realtime API
+          return result.result || 'I found some information but had trouble processing it.';
+        } catch (error) {
+          console.error('Error in knowledge_search tool:', error);
+          console.error('Error details:', {
+            message: error.message,
+            stack: error.stack,
+            apiUrl: process.env.NEXT_PUBLIC_API_URL
+          });
+          
+          // Return a user-friendly error message for voice conversation
+          return 'I encountered an issue accessing my knowledge base. Please contact our office and one of our fencing experts will be happy to help you.';
+        }
+      });
+  
+      agentRef.current = new RealtimeAgent({
+        name: 'SherpaPrompt Fencing Assistant',
+        instructions: `You are a professional voice assistant for a fencing company.
+      
+      CONVERSATION FLOW - Follow this exact order:
+      1. FIRST: Greet the caller warmly and ask for their name
+      2. SECOND: Once you have their name, ask for their email address  
+      3. THIRD: After collecting both name and email, ask about the nature of their fencing inquiry
+      4. FOURTH: Use your knowledge_search tool to provide accurate information based on their inquiry
+      
+      Your role is to:
+      - Greet callers warmly and professionally
+      - Collect customer information (name, then email, then inquiry details) in that specific order
+      - Use your knowledge_search tool to provide accurate information about:
+        * Fencing types, materials, and pricing
+        * Installation processes and timeframes
+        * Company services and warranties
+        * Emergency repair services
+      - Help schedule appointments and consultations
+      - Collect emergency information if urgent fence repairs are needed
+      - Always maintain a professional, helpful tone
+      
+      IMPORTANT INSTRUCTIONS:
+      - DO NOT move on to the next step until you have completed the current step
+      - When collecting name: Wait for their name before asking for email
+      - When collecting email: Wait for their email before asking about their inquiry
+      - When they ask about fencing services, pricing, materials, or company information, ALWAYS use the knowledge_search tool first
+      - Provide specific, accurate information based on the search results
+      - For pricing, mention ranges but emphasize that final quotes require an on-site consultation
+      - All company details (phone, service areas, advantages) should come from the knowledge search results
+      
+      Keep responses conversational but informative. Use the knowledge base to provide accurate details about fencing services.`,
+        
+        tools: [knowledgeSearchTool]
+      });
   }, []);
+
 
   const connectToSession = async () => {
     try {
