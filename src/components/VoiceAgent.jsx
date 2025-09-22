@@ -9,8 +9,9 @@ const VoiceAgent = () => {
   const sessionRef = useRef(null);
   const agentRef = useRef(null);
 
-// Initialize the agent
-useEffect(() => {
+  // Initialize the agent
+  useEffect(() => {
+    console.log('🚀 INITIALIZING VOICE AGENT...');
     // Define the knowledge search tool using the official tool() function
     const knowledgeSearchTool = tool({
       name: 'knowledge_search',
@@ -27,8 +28,10 @@ useEffect(() => {
       }
     }, async ({ query }) => {
         try {
-          console.log('Knowledge search called with query:', query);
-          console.log('API URL:', process.env.NEXT_PUBLIC_API_URL);
+          console.log('🎯 FUNCTION TOOL CALLED: knowledge_search');
+          console.log('📝 Query received:', query);
+          console.log('🌐 API URL:', process.env.NEXT_PUBLIC_API_URL);
+          console.log('🕰️ Timestamp:', new Date().toISOString());
           
           // Call our backend API to perform the knowledge search
           const apiUrl = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3001';
@@ -66,8 +69,9 @@ useEffect(() => {
         }
       });
   
-      agentRef.current = new RealtimeAgent({
-        name: 'SherpaPrompt Fencing Assistant',
+    console.log('🛠️ Creating RealtimeAgent with function tools...');
+    agentRef.current = new RealtimeAgent({
+      name: 'SherpaPrompt Fencing Assistant',
         instructions: `You are a professional voice assistant for a fencing company.
       
       CONVERSATION FLOW - Follow this exact order:
@@ -92,23 +96,34 @@ useEffect(() => {
       - DO NOT move on to the next step until you have completed the current step
       - When collecting name: Wait for their name before asking for email
       - When collecting email: Wait for their email before asking about their inquiry
-      - When they ask about fencing services, pricing, materials, or company information, ALWAYS use the knowledge_search tool first
+      - When they ask about fencing services, pricing, materials, service areas, coverage areas, or company information, ALWAYS use the knowledge_search tool first
+      - For service area questions, use knowledge_search with "service areas" as the query
+      - For pricing questions, use knowledge_search with the specific service type
+      - For company questions, use knowledge_search with "company information" as the query
       - Provide specific, accurate information based on the search results
       - For pricing, mention ranges but emphasize that final quotes require an on-site consultation
       - All company details (phone, service areas, advantages) should come from the knowledge search results
+      - CRITICAL: Once you have name and email, use knowledge_search for ANY information request
+      - Example: If asked "What areas do you serve?", immediately call knowledge_search with query "service areas"
       
       Keep responses conversational but informative. Use the knowledge base to provide accurate details about fencing services.`,
         
-        tools: [knowledgeSearchTool]
-      });
+      tools: [knowledgeSearchTool]
+    });
+    
+    console.log('✅ RealtimeAgent created successfully!');
+    console.log('🔧 Agent configured with', agentRef.current.tools?.length || 0, 'tools');
+    console.log('📝 Tool names:', agentRef.current.tools?.map(t => t.name || t.function?.name) || []);
   }, []);
 
 
   const connectToSession = async () => {
     try {
+      console.log('🔗 CONNECTING TO VOICE SESSION...');
       setStatus('Connecting...');
       
       // Get ephemeral token from our backend
+      console.log('🔑 Requesting ephemeral token from:', `${process.env.NEXT_PUBLIC_API_URL}/api/openai/ephemeral-token`);
       const tokenResponse = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/api/openai/ephemeral-token`, {
         method: 'POST',
         headers: {
@@ -123,13 +138,27 @@ useEffect(() => {
       const { apiKey } = await tokenResponse.json();
 
       // Create session with the agent
+      console.log('🤖 Creating RealtimeSession with agent...');
+      console.log('🔧 Agent tools configured:', agentRef.current?.tools?.length || 0);
       sessionRef.current = new RealtimeSession(agentRef.current, {
         model: 'gpt-realtime',
       });
 
       // Connect to the session
+      console.log('🔌 Connecting to realtime session...');
       await sessionRef.current.connect({ apiKey });
 
+      console.log('✅ VOICE SESSION CONNECTED SUCCESSFULLY!');
+      console.log('🎤 Listening for speech... Try saying "What are your service areas?"');
+      
+      // Add event listeners to debug the conversation
+      sessionRef.current.on?.('message', (event) => {
+        console.log('💬 Message event:', event);
+      });
+      
+      sessionRef.current.on?.('function_call', (event) => {
+        console.log('🚀 Function call event:', event);
+      });
       setIsConnected(true);
       setStatus('You are connected! Start talking.');
       console.log('You are connected!');
