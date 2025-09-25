@@ -1,24 +1,54 @@
 'use client';
 
 import { useState, useEffect, useRef } from 'react';
-import { RealtimeAgent, RealtimeSession, tool } from '@openai/agents-realtime';
+import { RealtimeAgent, RealtimeSession } from '@openai/agents-realtime';
 import ModelToggle from './ui/ModelToggle';
 import ChainedVoiceAgent from './ChainedVoiceAgent';
 
 const VoiceAgent = () => {
+  const agentInstructions = `You are a professional voice assistant for SherpaPrompt Fencing Company.
+      
+      PRINCIPLES (follow strictly):
+      - For ANY company or fencing information, you MUST call the knowledge_search function BEFORE answering.
+      - Do NOT delay tool use waiting for contact details; collect name/email, but still call the tool immediately when info is requested.
+      - NEVER guess or invent services, pricing, coverage areas, or materials.
+      
+      FLEXIBLE CONVERSATION FLOW:
+      1) Greet the caller warmly and attempt to collect their name and email.
+      2) If at ANY point the caller asks about company information, IMMEDIATELY call knowledge_search with a concise query, then continue the conversation.
+      
+      FUNCTION CALLING RULES:
+      - Always prefer knowledge_search for factual company details.
+      - Examples:
+        * "What areas do you serve?" → call knowledge_search with "service areas"
+        * "What types of fencing do you offer?" → call knowledge_search with "fencing types"
+        * "How much does a fence cost?" → call knowledge_search with "pricing"
+        * "What materials do you use?" → call knowledge_search with "materials"
+        * "Do you do emergency repairs?" → call knowledge_search with "emergency repairs"
+        * ANY company-specific question → call knowledge_search with relevant terms
+
+      EXAMPLE FUNCTION CALLING (do not speak the JSON; produce a function call):
+      - User: "What areas do you serve?"
+        Assistant: <function_call name="knowledge_search" arguments={"query":"service areas"}>
+      - User: "Do you do emergency repairs?"
+        Assistant: <function_call name="knowledge_search" arguments={"query":"emergency repairs"}>
+      
+      Keep responses conversational but informative. Always use knowledge_search when needed.`;
+
   const [isConnected, setIsConnected] = useState(false);
   const [status, setStatus] = useState('Ready to connect with GPT Realtime');
-  const [selectedModel, setSelectedModel] = useState('gpt-realtime');
+  const [selectedModel, setSelectedModel] = useState('gpt-4o-mini-realtime-preview');
   const sessionRef = useRef(null);
   const agentRef = useRef(null);
+  const knowledgeToolSchemaRef = useRef(null);
+  const activeFunctionCallRef = useRef({ callId: null, name: null, argsText: '' });
 
   // Initialize the agent
   useEffect(() => {
     console.log('🚀 INITIALIZING VOICE AGENT...');
-    console.log('🔧 Creating client-side function tool to bridge to server...');
-
-    // Define the knowledge search tool that calls our backend
-    const knowledgeSearchTool = tool({
+    console.log('🔧 Defining tool schema for knowledge_search...');
+    knowledgeToolSchemaRef.current = {
+      type: 'function',
       name: 'knowledge_search',
       description: 'Search the company knowledge base for fencing information',
       parameters: {
@@ -31,67 +61,17 @@ const VoiceAgent = () => {
         },
         required: ['query']
       }
-    }, async ({ query }) => {
-        try {
-          console.log('🚨🚨🚨 CLIENT-SIDE FUNCTION CALLED! 🚨🚨🚨');
-          console.log('📝 Query:', query);
-          
-          const response = await fetch('http://localhost:3001/api/voice-tools/search-knowledge', {
-            method: 'POST',
-            headers: {
-              'Content-Type': 'application/json',
-            },
-            body: JSON.stringify({ query }),
-          });
-
-          if (!response.ok) {
-            throw new Error(`HTTP error! status: ${response.status}`);
-          }
-
-          const result = await response.json();
-          console.log('✅ Function result:', result);
-          
-          return result.result || 'I found some information but had trouble processing it.';
-        } catch (error) {
-          console.error('❌ Function call error:', error);
-          return 'I encountered an issue accessing my knowledge base. Please contact our office directly.';
-        }
-      });
+    };
   
     console.log('🛠️ Creating RealtimeAgent with client-side tools...');
     agentRef.current = new RealtimeAgent({
       name: 'SherpaPrompt Fencing Assistant',
-      instructions: `You are a professional voice assistant for SherpaPrompt Fencing Company.
-      
-      CONVERSATION FLOW - Follow this exact order:
-      1. FIRST: Greet the caller warmly and ask for their name
-      2. SECOND: Once you have their name, ask for their email address  
-      3. THIRD: After collecting both name and email, ask about the nature of their fencing inquiry
-      4. FOURTH: IMMEDIATELY call the knowledge_search function to get accurate information
-      
-      CRITICAL FUNCTION CALLING RULES:
-      - You MUST use the knowledge_search function for ALL fencing-related questions after collecting name and email
-      - NEVER guess or make up information about services, pricing, or company details
-      - ALWAYS call knowledge_search before providing any specific company information
-      - Examples of when to call knowledge_search:
-        * "What areas do you serve?" → call knowledge_search with "service areas"
-        * "What types of fencing do you offer?" → call knowledge_search with "fencing types"
-        * "How much does a fence cost?" → call knowledge_search with "pricing"
-        * "What materials do you use?" → call knowledge_search with "materials"
-        * "Do you do emergency repairs?" → call knowledge_search with "emergency repairs"
-        * ANY question about the company → call knowledge_search with relevant terms
-      
-      FUNCTION CALLING IS MANDATORY for any company information requests.
-      
-      Keep responses conversational but informative. Always use the knowledge_search function when needed.`,
-      
-      // Use client-side tools that call our backend
-      tools: [knowledgeSearchTool]
+      instructions: agentInstructions,
+      // No client-side auto tools; we handle function calls manually
     });
     
     console.log('✅ RealtimeAgent created successfully!');
-    console.log('🔧 Agent configured with', agentRef.current.tools?.length || 0, 'tools');
-    console.log('📝 Tool names:', agentRef.current.tools?.map(t => t.name || t.function?.name) || []);
+    console.log('🔧 Agent configured (manual function-call handling mode)');
   }, []);
 
 
@@ -125,10 +105,13 @@ const VoiceAgent = () => {
 
       // Create session with the agent using the selected model
       console.log('🤖 Creating RealtimeSession with agent...');
-      console.log('🔧 Agent tools configured:', agentRef.current?.tools?.length || 0);
+      console.log('🔧 Tool schema available:', !!knowledgeToolSchemaRef.current);
       console.log('🎯 Session model:', model || selectedModel);
       sessionRef.current = new RealtimeSession(agentRef.current, {
-        model: selectedModel,
+        model: model || selectedModel,
+        // Realtime session must receive tool SCHEMAS, not callbacks
+        tools: knowledgeToolSchemaRef.current ? [knowledgeToolSchemaRef.current] : [],
+        instructions: agentInstructions,
       });
 
       // Connect to the session
@@ -138,6 +121,7 @@ const VoiceAgent = () => {
       console.log('✅ VOICE SESSION CONNECTED SUCCESSFULLY!');
       console.log(`🎤 Listening for speech with ${selectedModel}... Try saying "What are your service areas?"`);
       console.log('📊 Model confirmed:', model || selectedModel);
+
       
       // Add comprehensive debugging for function calls
       console.log('🔍 Adding event listeners for function call debugging...');
@@ -162,16 +146,81 @@ const VoiceAgent = () => {
         console.log('📝 Response output item added:', event);
         if (event.item?.type === 'function_call') {
           console.log('🎯 Function call detected in output:', event.item);
+          // Track active function call details for manual handling
+          activeFunctionCallRef.current = {
+            callId: event.item?.call_id || event.item?.id || null,
+            name: event.item?.name || event.item?.function?.name || null,
+            argsText: ''
+          };
         }
       });
 
       sessionRef.current.on?.('response.function_call_arguments.delta', (event) => {
         console.log('📊 Function call arguments delta:', event);
+        if (typeof event.delta === 'string' && activeFunctionCallRef.current.callId) {
+          activeFunctionCallRef.current.argsText += event.delta;
+        }
       });
 
-      // Check if session has access to tools
-      console.log('🛠️ Session tools available:', sessionRef.current.tools);
-      console.log('🛠️ Session configuration:', sessionRef.current.session);
+      // Handle end of function call arguments: execute and return output manually
+      sessionRef.current.on?.('response.function_call_arguments.done', async (event) => {
+        try {
+          console.log('✅ Function call arguments done:', event);
+          const { callId, name, argsText } = activeFunctionCallRef.current;
+          if (!callId || !name) {
+            console.warn('⚠️ No active function call to complete.');
+            return;
+          }
+          let parsedArgs = {};
+          try {
+            parsedArgs = argsText ? JSON.parse(argsText) : {};
+          } catch (e) {
+            console.warn('⚠️ Failed to parse function arguments as JSON. Raw:', argsText);
+          }
+
+          if (name === 'knowledge_search') {
+            console.log('🔧 Executing knowledge_search with args:', parsedArgs);
+            // Execute the same backend call used by the tool implementation
+            let outputText = 'No result.';
+            try {
+              const resp = await fetch('http://localhost:3001/api/voice-tools/search-knowledge', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ query: parsedArgs?.query || '' })
+              });
+              if (resp.ok) {
+                const json = await resp.json();
+                outputText = json?.result || outputText;
+              } else {
+                outputText = `Tool error: ${resp.status}`;
+              }
+            } catch (err) {
+              console.error('❌ knowledge_search backend error:', err);
+              outputText = 'Tool call failed due to a network error.';
+            }
+
+            // Send function output back to the model
+            const outputEvent = {
+              type: 'conversation.item.create',
+              item: {
+                type: 'function_call_output',
+                call_id: callId,
+                output: JSON.stringify({ result: outputText })
+              }
+            };
+            console.log('📤 Sending function_call_output:', outputEvent);
+            await sessionRef.current.send?.(outputEvent);
+
+            // Request model to continue with the result
+            await sessionRef.current.send?.({ type: 'response.create' });
+          }
+        } finally {
+          activeFunctionCallRef.current = { callId: null, name: null, argsText: '' };
+        }
+      });
+
+      // Note: sessionRef.current does not expose tools/config directly in this SDK
+      // We rely on manual function-call handling above.
       setIsConnected(true);
       setStatus('You are connected! Start talking.');
       console.log('You are connected!');
