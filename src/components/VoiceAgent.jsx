@@ -4,6 +4,7 @@ import { useState, useEffect, useRef } from 'react';
 import { RealtimeAgent, RealtimeSession, tool } from '@openai/agents-realtime';
 import ModelToggle from './ui/ModelToggle';
 import ChainedVoiceAgent from './ChainedVoiceAgent';
+import RealtimeLiveKitAgent from './RealtimeLiveKitAgent';
 
 const VoiceAgent = () => {
   const [isConnected, setIsConnected] = useState(false);
@@ -215,6 +216,8 @@ const VoiceAgent = () => {
     
     if (model === 'chained') {
       setStatus('Ready to start chained conversation');
+    } else if (model === 'livekit-agent') {
+      setStatus('Ready to connect to Realtime Agent');
     } else {
       setStatus(`Ready to connect with ${model === 'gpt-realtime' ? 'GPT Realtime' : 'GPT-4o Mini'}`);
     }
@@ -271,6 +274,8 @@ const VoiceAgent = () => {
         {/* Main Interface - Conditional based on selected model */}
         {selectedModel === 'chained' ? (
           <ChainedVoiceAgent onStatusChange={handleChainedStatusChange} />
+        ) : selectedModel === 'livekit-agent' ? (
+          <RealtimeLiveKitAgent onStatusChange={handleChainedStatusChange} />
         ) : (
           <div className="flex flex-col items-center">
             <div className="relative">
@@ -323,7 +328,7 @@ const VoiceAgent = () => {
         )}
 
         {/* Voice Active Indicator */}
-        {isConnected && (
+        {isConnected && selectedModel !== 'chained' && selectedModel !== 'livekit-agent' && (
           <div className="mt-12 text-center">
             <div className="inline-flex items-center space-x-2 px-6 py-3 bg-white/10 backdrop-blur-sm rounded-full border border-white/20">
               <div className="flex space-x-1">
