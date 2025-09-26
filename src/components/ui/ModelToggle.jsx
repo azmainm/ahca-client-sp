@@ -22,6 +22,11 @@ const ModelToggle = ({ selectedModel, onModelChange, disabled = false }) => {
       id: 'chained', 
       name: 'Chained Architecture',
       description: 'Reliable function calling'
+    },
+    { 
+      id: 'livekit-agent', 
+      name: 'LiveKit Agent',
+      description: 'Server-side realtime agent'
     }
   ];
 
@@ -39,15 +44,17 @@ const ModelToggle = ({ selectedModel, onModelChange, disabled = false }) => {
         <div 
           className={`absolute top-1 bottom-1 rounded-xl bg-gradient-to-r transition-all duration-300 ease-out ${
             selectedModel === 'gpt-realtime' 
-              ? 'from-blue-500 to-blue-600 left-1 right-2/3' 
+              ? 'from-blue-500 to-blue-600 left-1 right-3/4' 
               : selectedModel === 'gpt-4o-mini-realtime-preview'
-                ? 'from-emerald-500 to-emerald-600 left-1/3 right-1/3'
-                : 'from-purple-500 to-purple-600 left-2/3 right-1'
+                ? 'from-emerald-500 to-emerald-600 left-1/4 right-1/2'
+                : selectedModel === 'chained'
+                  ? 'from-purple-500 to-purple-600 left-1/2 right-1/4'
+                  : 'from-orange-500 to-orange-600 left-3/4 right-1'
           }`}
         />
         
         {/* Toggle Options */}
-        <div className="relative grid grid-cols-3 gap-0">
+        <div className="relative grid grid-cols-4 gap-0">
           {models.map((model) => (
             <button
               key={model.id}
@@ -76,7 +83,9 @@ const ModelToggle = ({ selectedModel, onModelChange, disabled = false }) => {
               ? 'bg-blue-400' 
               : selectedModel === 'gpt-4o-mini-realtime-preview'
                 ? 'bg-emerald-400'
-                : 'bg-purple-400'
+                : selectedModel === 'chained'
+                  ? 'bg-purple-400'
+                  : 'bg-orange-400'
           }`}></div>
           <span className="text-white/80 text-xs font-medium">
             {models.find(m => m.id === selectedModel)?.name || 'Unknown Model'}
