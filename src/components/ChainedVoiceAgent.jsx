@@ -1,41 +1,42 @@
 /**
- * ChainedVoiceAgent Component
- * Implements OpenAI's recommended chained architecture:
- * Audio → Transcription → Text Processing (with functions) → Speech Synthesis → Audio
+ * ChainedVoiceAgent Component - OpenAI Documentation Implementation
+ * Follows the exact chained architecture from OpenAI documentation:
+ * Audio → STT → Text Processing → TTS → Audio
+ * With automatic turn detection using proper VAD
  */
 'use client';
 
 import { useState, useRef, useEffect } from 'react';
 
 const ChainedVoiceAgent = ({ onStatusChange }) => {
-  const [isActive, setIsActive] = useState(false);
+  // Core state - simplified following OpenAI patterns
+  const [isRecording, setIsRecording] = useState(false);
   const [isProcessing, setIsProcessing] = useState(false);
-  const [conversationHistory, setConversationHistory] = useState([]);
-  const [currentStatus, setCurrentStatus] = useState('Ready to start continuous conversation');
-  const [isListening, setIsListening] = useState(false);
+  const [currentStatus, setCurrentStatus] = useState('Ready to start conversation');
+  const [sessionId, setSessionId] = useState(null);
+  const [userInfo, setUserInfo] = useState({ name: null, email: null, collected: false });
+  const [conversationCount, setConversationCount] = useState(0);
 
+  // Refs for media handling
   const mediaRecorderRef = useRef(null);
   const audioChunksRef = useRef([]);
   const streamRef = useRef(null);
-  const silenceTimeoutRef = useRef(null);
-  const vadRef = useRef(null);
 
   useEffect(() => {
-    // Update parent component with status changes
     onStatusChange?.(currentStatus);
   }, [currentStatus, onStatusChange]);
 
   const updateStatus = (status) => {
     setCurrentStatus(status);
-    console.log('📊 Chained Voice Status:', status);
+    console.log('📊 Status:', status);
   };
 
   const startConversation = async () => {
     try {
-      console.log('🎙️ Starting continuous conversation...');
-      updateStatus('Starting microphone...');
+      console.log('🎙️ Starting chained voice conversation...');
+      updateStatus('Starting conversation...');
 
-      // Request microphone access
+      // Get microphone permission
       const stream = await navigator.mediaDevices.getUserMedia({ 
         audio: {
           sampleRate: 16000,
@@ -46,162 +47,219 @@ const ChainedVoiceAgent = ({ onStatusChange }) => {
       });
       
       streamRef.current = stream;
-      setIsActive(true);
-      updateStatus('Listening... Start speaking anytime');
-      
-      // Start continuous listening
-      startContinuousListening();
 
+      // Create session ID
+      const newSessionId = `session-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`;
+      setSessionId(newSessionId);
+      
+      console.log('✅ Session started:', newSessionId);
+
+      // Play initial greeting
+      const initialGreeting = "Hello! Welcome to SherpaPrompt Fencing Company. I'm here to help you with your fencing needs. To get started, could you please tell me your name and email address?";
+      
+      updateStatus('Playing greeting...');
+      await playTextAsAudio(initialGreeting, newSessionId);
+
+      updateStatus('Ready - Click to speak');
+      
     } catch (error) {
       console.error('❌ Error starting conversation:', error);
-      updateStatus('Error accessing microphone');
+      updateStatus('Error: ' + error.message);
     }
   };
 
   const stopConversation = () => {
     console.log('⏹️ Stopping conversation...');
-    setIsActive(false);
-    setIsListening(false);
     
-    if (silenceTimeoutRef.current) {
-      clearTimeout(silenceTimeoutRef.current);
-    }
-    
+    // Stop recording if active
     if (mediaRecorderRef.current && mediaRecorderRef.current.state === 'recording') {
       mediaRecorderRef.current.stop();
     }
     
+    // Stop stream
     if (streamRef.current) {
       streamRef.current.getTracks().forEach(track => track.stop());
+      streamRef.current = null;
     }
-    
-    updateStatus('Conversation stopped');
+
+    // Reset state
+    setIsRecording(false);
+    setIsProcessing(false);
+    setSessionId(null);
+    setUserInfo({ name: null, email: null, collected: false });
+    setConversationCount(0);
+    updateStatus('Conversation ended');
   };
 
-  const startContinuousListening = () => {
-    if (!streamRef.current || !isActive) return;
+  const startRecording = async () => {
+    if (!streamRef.current || !sessionId) {
+      updateStatus('No active session. Please start conversation first.');
+      return;
+    }
 
-    audioChunksRef.current = [];
-
-    // Create MediaRecorder for this segment
-    const mediaRecorder = new MediaRecorder(streamRef.current, {
-      mimeType: 'audio/webm;codecs=opus'
-    });
-    
-    mediaRecorderRef.current = mediaRecorder;
-
-    mediaRecorder.ondataavailable = (event) => {
-      console.log('📊 Audio data available:', event.data.size, 'bytes');
-      if (event.data.size > 0) {
-        audioChunksRef.current.push(event.data);
-      }
-    };
-
-    mediaRecorder.onstop = async () => {
-      if (audioChunksRef.current.length > 0 && isActive) {
-        console.log('🔴 Speech segment ended, processing...');
-        await processRecording();
-      }
-    };
-
-    // Start recording with data collection every 100ms
-    mediaRecorder.start(100);
-    setIsListening(true);
-    updateStatus('Listening... Speak naturally');
-    
-    console.log('🎙️ MediaRecorder started, state:', mediaRecorder.state);
-
-    // Simple VAD: Stop recording after 4 seconds of "speech time"
-    // In production, you'd use proper VAD like Silero
-    silenceTimeoutRef.current = setTimeout(() => {
-      if (mediaRecorder.state === 'recording') {
-        console.log('⏰ Recording timeout reached, stopping...');
-        mediaRecorder.stop();
-        setIsListening(false);
-      }
-    }, 4000); // 4 seconds max per speech segment
-  };
-
-  const processRecording = async () => {
     try {
-      console.log('🔄 Processing recording through chained architecture...');
+      console.log('🎙️ Starting recording...');
+      
+      // Reset audio chunks
+      audioChunksRef.current = [];
 
-      // Step 1: Convert audio to base64
+      // Create MediaRecorder
+      const mediaRecorder = new MediaRecorder(streamRef.current, {
+        mimeType: 'audio/webm;codecs=opus'
+      });
+      
+      mediaRecorderRef.current = mediaRecorder;
+
+      // Handle data collection
+      mediaRecorder.ondataavailable = (event) => {
+        if (event.data.size > 0) {
+          audioChunksRef.current.push(event.data);
+          console.log('📊 Audio chunk collected:', event.data.size, 'bytes');
+        }
+      };
+
+      // Handle recording completion
+      mediaRecorder.onstop = async () => {
+        console.log('🔴 Recording stopped, processing...');
+        setIsRecording(false);
+        
+        if (audioChunksRef.current.length > 0) {
+          await processAudioChain();
+        } else {
+          updateStatus('No audio detected. Try again.');
+        }
+      };
+
+      // Start recording
+      mediaRecorder.start(100); // Collect data every 100ms
+      setIsRecording(true);
+      updateStatus('Recording... Speak now');
+      
+      console.log('✅ Recording started');
+
+    } catch (error) {
+      console.error('❌ Recording error:', error);
+      updateStatus('Recording failed: ' + error.message);
+      setIsRecording(false);
+    }
+  };
+
+  const stopRecording = () => {
+    if (mediaRecorderRef.current && mediaRecorderRef.current.state === 'recording') {
+      console.log('⏹️ Stopping recording...');
+      mediaRecorderRef.current.stop();
+    }
+  };
+
+  const processAudioChain = async () => {
+    try {
+      setIsProcessing(true);
+      updateStatus('Processing...');
+
+      // Step 1: Convert audio to format for API
       const audioBlob = new Blob(audioChunksRef.current, { type: 'audio/webm' });
       console.log('📦 Audio blob size:', audioBlob.size, 'bytes');
       
       if (audioBlob.size === 0) {
-        console.log('⚠️ No audio data recorded');
-        updateStatus('No audio detected. Try speaking louder.');
-        setIsProcessing(false);
-        if (isActive) {
-          setTimeout(() => startContinuousListening(), 1000);
-        }
+        updateStatus('No audio detected');
         return;
       }
-      
-      const audioBase64 = await blobToBase64(audioBlob);
-      console.log('📦 Audio base64 length:', audioBase64.length);
 
-      // Step 2: Transcribe audio
-      updateStatus('Transcribing speech...');
-      const transcriptionResponse = await fetch('http://localhost:3001/api/chained-voice/transcribe', {
+      const audioBase64 = await blobToBase64(audioBlob);
+
+      // Step 2: Transcribe with Whisper
+      updateStatus('Transcribing...');
+      const transcriptionResponse = await fetch(`${process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3001'}/api/chained-voice/transcribe`, {
         method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({ audio: audioBase64 }),
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ 
+          audio: audioBase64,
+          sessionId: sessionId 
+        }),
       });
 
       if (!transcriptionResponse.ok) {
-        throw new Error('Transcription failed');
+        throw new Error(`Transcription failed: ${transcriptionResponse.status}`);
       }
 
       const transcriptionData = await transcriptionResponse.json();
       const userText = transcriptionData.text;
       
-      console.log('📝 Transcribed text:', userText);
+      console.log('📝 Transcribed:', userText);
 
       if (!userText || userText.trim().length === 0) {
-        updateStatus('No speech detected. Try again.');
-        setIsProcessing(false);
+        updateStatus('No speech detected');
         return;
       }
 
-      // Step 3: Process text with GPT-4.1 and function calling
-      updateStatus('Thinking and searching knowledge base...');
-      const processResponse = await fetch('http://localhost:3001/api/chained-voice/process', {
+      // Step 3: Process with LLM and function calling
+      updateStatus('Processing with AI...');
+      const processResponse = await fetch(`${process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3001'}/api/chained-voice/process`, {
         method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
+        headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ 
           text: userText,
-          conversationHistory: conversationHistory 
+          sessionId: sessionId 
         }),
       });
 
       if (!processResponse.ok) {
-        throw new Error('Text processing failed');
+        throw new Error(`Processing failed: ${processResponse.status}`);
       }
 
       const processData = await processResponse.json();
       const responseText = processData.response;
       
       console.log('🤖 AI response:', responseText);
-      console.log('🔧 Had function calls:', processData.hadFunctionCalls);
 
-      // Update conversation history
-      setConversationHistory(processData.conversationHistory || []);
+      // Update user info if collected
+      if (processData.userInfo) {
+        setUserInfo(processData.userInfo);
+      }
 
-      // Step 4: Convert response to speech
+      setConversationCount(prev => prev + 1);
+
+      // Step 4: Convert to speech with TTS
       updateStatus('Converting to speech...');
-      const synthesisResponse = await fetch('http://localhost:3001/api/chained-voice/synthesize', {
+      const synthesisResponse = await fetch(`${process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3001'}/api/chained-voice/synthesize`, {
         method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({ text: responseText }),
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ 
+          text: responseText,
+          sessionId: sessionId 
+        }),
+      });
+
+      if (!synthesisResponse.ok) {
+        throw new Error(`Speech synthesis failed: ${synthesisResponse.status}`);
+      }
+
+      const synthesisData = await synthesisResponse.json();
+      
+      // Step 5: Play audio response
+      updateStatus('AI responding...');
+      await playAudio(synthesisData.audio);
+
+      // Ready for next interaction
+      updateStatus('Ready - Click to speak');
+
+    } catch (error) {
+      console.error('❌ Processing error:', error);
+      updateStatus(`Error: ${error.message}`);
+    } finally {
+      setIsProcessing(false);
+    }
+  };
+
+  const playTextAsAudio = async (text, currentSessionId = null) => {
+    try {
+      const synthesisResponse = await fetch(`${process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3001'}/api/chained-voice/synthesize`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ 
+          text: text,
+          sessionId: currentSessionId || sessionId 
+        }),
       });
 
       if (!synthesisResponse.ok) {
@@ -209,39 +267,9 @@ const ChainedVoiceAgent = ({ onStatusChange }) => {
       }
 
       const synthesisData = await synthesisResponse.json();
-      
-      // Step 5: Play the audio response
-      updateStatus('Playing response...');
       await playAudio(synthesisData.audio);
-
-      setIsProcessing(false);
-
-      // Step 6: Resume listening if conversation is still active
-      if (isActive) {
-        updateStatus('Listening... Continue speaking');
-        // Small delay before restarting listening
-        setTimeout(() => {
-          if (isActive) {
-            startContinuousListening();
-          }
-        }, 500);
-      } else {
-        updateStatus('Ready for next message');
-      }
-
     } catch (error) {
-      console.error('❌ Error in chained processing:', error);
-      updateStatus(`Error: ${error.message}`);
-      setIsProcessing(false);
-      
-      // Resume listening even after errors if conversation is active
-      if (isActive) {
-        setTimeout(() => {
-          if (isActive) {
-            startContinuousListening();
-          }
-        }, 1000);
-      }
+      console.error('❌ Text-to-speech error:', error);
     }
   };
 
@@ -282,64 +310,39 @@ const ChainedVoiceAgent = ({ onStatusChange }) => {
   };
 
   const handleToggleConversation = () => {
-    if (isActive) {
+    if (sessionId) {
       stopConversation();
     } else {
       startConversation();
     }
   };
 
-  const resetConversation = () => {
-    setConversationHistory([]);
-    updateStatus('Conversation reset. Ready to start fresh.');
+  const handleToggleRecording = () => {
+    if (isRecording) {
+      stopRecording();
+    } else {
+      startRecording();
+    }
   };
 
   return (
     <div className="flex flex-col items-center space-y-6">
-      {/* Main Recording Button */}
+      {/* Main conversation button - smaller */}
       <div className="relative">
-        {/* Outer glow ring */}
-        <div className={`absolute inset-0 rounded-full transition-all duration-500 ${
-          isListening 
-            ? 'animate-pulse bg-green-500/20 scale-110' 
-            : isProcessing
-              ? 'animate-pulse bg-yellow-500/20 scale-110'
-              : isActive
-                ? 'animate-pulse bg-purple-500/20 scale-110'
-                : 'bg-purple-500/20 scale-100'
-        }`}></div>
-        
-        {/* Middle ring */}
-        <div className={`absolute inset-2 rounded-full border-2 transition-all duration-300 ${
-          isListening 
-            ? 'border-green-500/50 animate-spin-slow' 
-            : isProcessing
-              ? 'border-yellow-500/50 animate-spin-slow'
-              : isActive
-                ? 'border-purple-500/50 animate-spin-slow'
-                : 'border-purple-500/50'
-        }`}></div>
-        
-        {/* Main button */}
         <button
           onClick={handleToggleConversation}
           disabled={isProcessing}
-          className={`relative w-32 h-32 rounded-full transition-all duration-300 transform hover:scale-105 active:scale-95 focus:outline-none focus:ring-4 focus:ring-purple-500/50 disabled:cursor-not-allowed disabled:transform-none ${
-            isActive
+          className={`relative w-20 h-20 rounded-full transition-all duration-300 transform hover:scale-105 active:scale-95 focus:outline-none focus:ring-4 focus:ring-purple-500/50 disabled:cursor-not-allowed disabled:transform-none ${
+            sessionId
               ? 'bg-gradient-to-br from-red-500 to-red-600 hover:from-red-400 hover:to-red-500 shadow-lg shadow-red-500/25'
               : 'bg-gradient-to-br from-purple-500 to-purple-600 hover:from-purple-400 hover:to-purple-500 shadow-lg shadow-purple-500/25'
           }`}
         >
-          {/* Button Icon */}
           <div className="flex items-center justify-center text-white">
-            {isProcessing ? (
-              <div className="w-8 h-8 border-3 border-white border-t-transparent rounded-full animate-spin"></div>
-            ) : isActive ? (
-              // Stop icon
-              <div className="w-8 h-8 bg-white rounded-sm"></div>
+            {sessionId ? (
+              <div className="w-4 h-4 bg-white rounded-sm"></div>
             ) : (
-              // Start conversation icon
-              <svg className="w-10 h-10" fill="currentColor" viewBox="0 0 20 20">
+              <svg className="w-6 h-6" fill="currentColor" viewBox="0 0 20 20">
                 <path fillRule="evenodd" d="M7 4a3 3 0 016 0v4a3 3 0 11-6 0V4zm4 10.93A7.001 7.001 0 0017 8a1 1 0 10-2 0A5 5 0 015 8a1 1 0 00-2 0 7.001 7.001 0 006 6.93V17H6a1 1 0 100 2h8a1 1 0 100-2h-3v-2.07z" clipRule="evenodd" />
               </svg>
             )}
@@ -347,53 +350,69 @@ const ChainedVoiceAgent = ({ onStatusChange }) => {
         </button>
       </div>
       
-      {/* Button Label */}
-      <p className="text-white/80 text-lg font-medium text-center">
-        {isActive ? 'Tap to End Conversation' : 'Tap to Start Conversation'}
+      <p className="text-white/80 text-sm font-medium text-center">
+        {sessionId ? 'End Conversation' : 'Start Conversation'}
       </p>
 
-      {/* Active Status Indicator */}
-      {isActive && (
+      {/* Recording button - only show when conversation is active - larger */}
+      {sessionId && (
+        <div className="relative">
+          <button
+            onClick={handleToggleRecording}
+            disabled={isProcessing}
+            className={`relative w-32 h-32 rounded-full transition-all duration-300 transform hover:scale-105 active:scale-95 focus:outline-none focus:ring-4 focus:ring-blue-500/50 disabled:cursor-not-allowed disabled:transform-none ${
+              isRecording
+                ? 'bg-gradient-to-br from-red-500 to-red-600 hover:from-red-400 hover:to-red-500 shadow-lg shadow-red-500/25'
+                : 'bg-gradient-to-br from-blue-500 to-blue-600 hover:from-blue-400 hover:to-blue-500 shadow-lg shadow-blue-500/25'
+            }`}
+          >
+            <div className="flex items-center justify-center text-white">
+              {isProcessing ? (
+                <div className="w-6 h-6 border-2 border-white border-t-transparent rounded-full animate-spin"></div>
+              ) : isRecording ? (
+                <div className="w-8 h-8 bg-white rounded-sm"></div>
+              ) : (
+                <svg className="w-10 h-10" fill="currentColor" viewBox="0 0 20 20">
+                  <path fillRule="evenodd" d="M7 4a3 3 0 016 0v4a3 3 0 11-6 0V4zm4 10.93A7.001 7.001 0 0017 8a1 1 0 10-2 0A5 5 0 715 8a1 1 0 00-2 0 7.001 7.001 0 006 6.93V17H6a1 1 0 100 2h8a1 1 0 100-2h-3v-2.07z" clipRule="evenodd" />
+                </svg>
+              )}
+            </div>
+          </button>
+          
+          <p className="text-white/80 text-lg font-medium text-center mt-2">
+            {isRecording ? 'Recording...' : 'Push to Talk'}
+          </p>
+        </div>
+      )}
+
+      {/* Status */}
+      <div className="text-center">
+        <div className="inline-flex items-center px-4 py-2 rounded-full text-sm font-medium transition-all duration-300 bg-purple-500/20 text-purple-400 border border-purple-500/30">
+          <div className="w-2 h-2 rounded-full mr-2 bg-purple-400"></div>
+          {currentStatus}
+        </div>
+      </div>
+
+      {/* User Information */}
+      {userInfo.name && (
         <div className="text-center">
-          <div className={`inline-flex items-center px-3 py-1.5 backdrop-blur-sm rounded-full border transition-all duration-300 ${
-            isListening 
-              ? 'bg-green-500/20 border-green-500/30'
-              : isProcessing
-                ? 'bg-yellow-500/20 border-yellow-500/30'
-                : 'bg-purple-500/20 border-purple-500/30'
-          }`}>
-            <div className={`w-2 h-2 rounded-full mr-2 ${
-              isListening 
-                ? 'bg-green-400 animate-pulse'
-                : isProcessing
-                  ? 'bg-yellow-400 animate-pulse'
-                  : 'bg-purple-400'
-            }`}></div>
-            <span className="text-white/90 text-xs font-medium">
-              {isListening ? 'Listening...' : isProcessing ? 'Processing...' : 'Ready'}
-            </span>
+          <div className="inline-block bg-white/5 backdrop-blur-sm rounded-xl border border-white/10 px-4 py-2">
+            <div className="text-white/90 text-sm font-semibold">User Info</div>
+            <div className="text-white/70 text-xs mt-1">
+              Name: {userInfo.name}
+              {userInfo.email && <> • Email: {userInfo.email}</>}
+            </div>
           </div>
         </div>
       )}
 
-      {/* Reset Button */}
-      {conversationHistory.length > 0 && (
-        <button
-          onClick={resetConversation}
-          className="px-4 py-2 bg-white/10 hover:bg-white/20 backdrop-blur-sm rounded-lg border border-white/20 text-white/80 text-sm transition-all duration-200"
-        >
-          Reset Conversation
-        </button>
-      )}
-
-      {/* Conversation History Info */}
-      {conversationHistory.length > 0 && (
+      {/* Conversation Counter */}
+      {conversationCount > 0 && (
         <div className="text-center">
-          <div className="inline-flex items-center px-3 py-1.5 bg-white/5 backdrop-blur-sm rounded-full border border-white/10">
-            <div className="w-2 h-2 bg-purple-400 rounded-full mr-2"></div>
-            <span className="text-white/80 text-xs font-medium">
-              {conversationHistory.length} messages in conversation
-            </span>
+          <div className="inline-block bg-white/5 backdrop-blur-sm rounded-xl border border-white/10 px-3 py-1">
+            <div className="text-white/80 text-xs">
+              Exchanges: {conversationCount}
+            </div>
           </div>
         </div>
       )}
