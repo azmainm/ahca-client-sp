@@ -1,7 +1,7 @@
 'use client';
 
-import { useState, useRef } from 'react';
-import { Copy, Edit, Save, X, Mic, Square, Loader2, RotateCcw } from 'lucide-react';
+import { useState, useRef, useEffect } from 'react';
+import { Copy, Edit, Save, X, Mic, Square, Loader2, RotateCcw, Upload, FileText, Trash2 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 
 const PrototypeEstimator = () => {
@@ -13,8 +13,122 @@ const PrototypeEstimator = () => {
   const [editedEstimate, setEditedEstimate] = useState('');
   const [lastServerEstimate, setLastServerEstimate] = useState('');
   
+  // Catalog file management state
+  const [customCatalog, setCustomCatalog] = useState(null);
+  const [catalogFileName, setCatalogFileName] = useState('');
+  const [isDragOver, setIsDragOver] = useState(false);
+  
   const mediaRecorderRef = useRef(null);
   const audioChunksRef = useRef([]);
+  const fileInputRef = useRef(null);
+
+  // Load custom catalog from localStorage on component mount
+  useEffect(() => {
+    const savedCatalog = localStorage.getItem('customCatalog');
+    const savedFileName = localStorage.getItem('catalogFileName');
+    
+    if (savedCatalog && savedFileName) {
+      try {
+        const parsedCatalog = JSON.parse(savedCatalog);
+        setCustomCatalog(parsedCatalog);
+        setCatalogFileName(savedFileName);
+        setStatus(`Using custom catalog: ${savedFileName}`);
+      } catch (error) {
+        console.error('Error parsing saved catalog:', error);
+        localStorage.removeItem('customCatalog');
+        localStorage.removeItem('catalogFileName');
+      }
+    }
+  }, []);
+
+  // File handling functions
+  const handleFileSelect = (file) => {
+    if (!file) return;
+    
+    const allowedTypes = ['application/json', 'text/plain'];
+    const allowedExtensions = ['.json', '.txt'];
+    
+    const hasValidType = allowedTypes.includes(file.type);
+    const hasValidExtension = allowedExtensions.some(ext => file.name.toLowerCase().endsWith(ext));
+    
+    if (!hasValidType && !hasValidExtension) {
+      setStatus('Error: Please upload a JSON or TXT file');
+      return;
+    }
+
+    const reader = new FileReader();
+    reader.onload = (e) => {
+      try {
+        const content = e.target.result;
+        let parsedCatalog;
+        
+        if (file.name.toLowerCase().endsWith('.json')) {
+          parsedCatalog = JSON.parse(content);
+        } else {
+          // For TXT files, try to parse as JSON
+          parsedCatalog = JSON.parse(content);
+        }
+        
+        // Validate catalog structure (basic check)
+        if (!parsedCatalog || typeof parsedCatalog !== 'object') {
+          throw new Error('Invalid catalog format');
+        }
+        
+        // Save to localStorage and state
+        localStorage.setItem('customCatalog', JSON.stringify(parsedCatalog));
+        localStorage.setItem('catalogFileName', file.name);
+        
+        setCustomCatalog(parsedCatalog);
+        setCatalogFileName(file.name);
+        setStatus(`Custom catalog loaded: ${file.name}`);
+        
+      } catch (error) {
+        console.error('Error parsing catalog file:', error);
+        setStatus('Error: Invalid JSON format in uploaded file');
+      }
+    };
+    
+    reader.readAsText(file);
+  };
+
+  const handleDragOver = (e) => {
+    e.preventDefault();
+    setIsDragOver(true);
+  };
+
+  const handleDragLeave = (e) => {
+    e.preventDefault();
+    setIsDragOver(false);
+  };
+
+  const handleDrop = (e) => {
+    e.preventDefault();
+    setIsDragOver(false);
+    
+    const files = e.dataTransfer.files;
+    if (files.length > 0) {
+      handleFileSelect(files[0]);
+    }
+  };
+
+  const handleFileInputChange = (e) => {
+    const file = e.target.files[0];
+    if (file) {
+      handleFileSelect(file);
+    }
+  };
+
+  const clearCustomCatalog = () => {
+    localStorage.removeItem('customCatalog');
+    localStorage.removeItem('catalogFileName');
+    setCustomCatalog(null);
+    setCatalogFileName('');
+    setStatus('Custom catalog cleared - using default catalog');
+  };
+
+  const openFileDialog = () => {
+    fileInputRef.current?.click();
+  };
 
   const startRecording = async () => {
     try {
@@ -81,6 +195,13 @@ const PrototypeEstimator = () => {
       const timestamp = new Date().toISOString().replace(/[:.]/g, '-');
       const filename = `recording-${timestamp}.webm`;
       formData.append('audio', audioBlob, filename);
+      
+      // Include custom catalog if available
+      if (customCatalog) {
+        formData.append('customCatalog', JSON.stringify(customCatalog));
+        console.log('📦 [UPLOAD] Including custom catalog:', catalogFileName);
+      }
+      
       console.log('📦 [UPLOAD] FormData created with filename:', filename);
 
       console.log('📡 [UPLOAD] Sending request to server...');
@@ -188,6 +309,72 @@ const PrototypeEstimator = () => {
           <p className="text-white/60 text-sm">
             AI-powered Voice Estimation Tool
           </p>
+        </div>
+
+        {/* Custom Catalog Upload Section */}
+        <div className="mb-8">
+          <div className="bg-white/5 backdrop-blur-sm rounded-2xl border border-white/10 p-6">
+            <div className="flex justify-between items-center mb-4">
+              <h3 className="text-white/90 text-lg font-semibold">Catalog Configuration</h3>
+              {customCatalog && (
+                <Button
+                  onClick={clearCustomCatalog}
+                  size="sm"
+                  variant="outline"
+                  className="bg-red-500/20 text-red-400 hover:bg-red-500/30 border border-red-500/30"
+                >
+                  <Trash2 className="w-4 h-4 mr-2" />
+                  Clear Custom
+                </Button>
+              )}
+            </div>
+            
+            {/* Current Catalog Status */}
+            <div className="mb-4">
+              <div className={`inline-flex items-center px-3 py-2 rounded-lg text-sm ${
+                customCatalog 
+                  ? 'bg-emerald-500/20 text-emerald-400 border border-emerald-500/30'
+                  : 'bg-blue-500/20 text-blue-400 border border-blue-500/30'
+              }`}>
+                <FileText className="w-4 h-4 mr-2" />
+                {customCatalog ? `Using: ${catalogFileName}` : 'Using: Default catalog.json'}
+              </div>
+            </div>
+
+            {/* File Drop Zone */}
+            <div
+              className={`border-2 border-dashed rounded-xl p-6 text-center transition-all duration-300 cursor-pointer ${
+                isDragOver
+                  ? 'border-blue-400 bg-blue-500/10'
+                  : 'border-white/30 hover:border-white/50 hover:bg-white/5'
+              }`}
+              onDragOver={handleDragOver}
+              onDragLeave={handleDragLeave}
+              onDrop={handleDrop}
+              onClick={openFileDialog}
+            >
+              <Upload className="w-8 h-8 text-white/60 mx-auto mb-3" />
+              <p className="text-white/80 text-sm mb-2">
+                Drop your catalog file here, or click to browse
+              </p>
+              <p className="text-white/50 text-xs">
+                Supports JSON and TXT files (JSON format expected)
+              </p>
+              
+              {/* Hidden file input */}
+              <input
+                ref={fileInputRef}
+                type="file"
+                accept=".json,.txt"
+                onChange={handleFileInputChange}
+                className="hidden"
+              />
+            </div>
+            
+            <p className="text-white/40 text-xs mt-3">
+              Upload a custom catalog file to override default pricing. Files are stored locally for this session.
+            </p>
+          </div>
         </div>
 
         {/* Status Indicator */}
@@ -400,10 +587,10 @@ const PrototypeEstimator = () => {
               <div className="pt-2"><strong>With Specific Labor Hours:</strong></div>
               <div>&ldquo;Install 50 feet of fencing, post digging will take 8 hours&rdquo;</div>
               <div>&ldquo;Cedar fence installation, 6 hours for panel work and 4 hours for concrete&rdquo;</div>
-              <div>&ldquo;Fence project needs 12 hours total labor&rdquo;</div>
               
               <div className="pt-2"><strong>Multiple Items Together:</strong></div>
               <div>&ldquo;I need 80 feet of cedar privacy fence, 6 cedar posts, 10 concrete bags, gate hardware, and staining for the whole project&rdquo;</div>
+              <div>&ldquo;I need 150 feet of 12/2 Romex, 8 standard outlets, 4 single-pole switches, 6 LED recessed lights, 6 hours of rough-in wiring, and a permit fee for the project.&rdquo;</div>
               
               <div className="pt-2"><strong>Multiple Recordings:</strong></div>
               <div>Record each part separately and they&rsquo;ll be added below each other</div>
