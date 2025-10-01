@@ -221,18 +221,27 @@ const PrototypeEstimator = () => {
 
       const data = await response.json();
       console.log('✅ [UPLOAD] Success! Received data:', data);
-      console.log('🎯 [UPLOAD] Estimate object:', data.estimate);
+      console.log('🎯 [UPLOAD] Estimate format:', data.meta?.format);
       console.log('⏱️ [UPLOAD] Processing time:', data.meta?.processing_time_ms, 'ms');
       
-      // Format the estimate nicely
-      const formattedEstimate = JSON.stringify(data.estimate, null, 2);
+      // Handle the estimate response - ensure it's a string
+      let formattedEstimate;
+      if (typeof data.estimate === 'string') {
+        formattedEstimate = data.estimate;
+      } else if (typeof data.estimate === 'object') {
+        // Fallback: if server sent object instead of formatted string, stringify it
+        console.warn('⚠️ [UPLOAD] Received object instead of formatted string, falling back to JSON.stringify');
+        formattedEstimate = JSON.stringify(data.estimate, null, 2);
+      } else {
+        formattedEstimate = 'Error: Invalid estimate format received from server';
+      }
       
       // Append to existing estimate if there's content, otherwise set as new
       const newEstimate = estimate.trim() 
         ? estimate + '\n\n' + '--- New Estimate ---' + '\n\n' + formattedEstimate
         : formattedEstimate;
       
-      console.log('📝 [UPLOAD] Setting estimate in UI...');
+      console.log('📝 [UPLOAD] Setting formatted estimate in UI...');
       setEstimate(newEstimate);
       setLastServerEstimate(newEstimate);
       setStatus(`Estimate generated (${data.meta.processing_time_ms}ms)`);
@@ -472,16 +481,16 @@ const PrototypeEstimator = () => {
 
             {/* Instructions */}
             <div className="mt-8 text-center">
-              <div className="inline-block bg-white/5 backdrop-blur-sm rounded-2xl border border-white/10 p-6">
-                <h3 className="text-white/90 text-sm font-semibold mb-3">How to Use</h3>
-                <div className="text-white/60 text-xs space-y-2">
-                  <div>1. Click the microphone to start recording</div>
-                  <div>2. Describe your fencing project</div>
-                  <div>3. Optionally specify labor hours for tasks</div>
-                  <div>4. Click stop to generate estimate</div>
-                  <div>5. Edit, save, or copy the result</div>
-                </div>
+            <div className="inline-block bg-white/5 backdrop-blur-sm rounded-2xl border border-white/10 p-6">
+              <h3 className="text-white/90 text-sm font-semibold mb-3">How to Use</h3>
+              <div className="text-white/60 text-xs space-y-2">
+                <div>1. Click the microphone to start recording</div>
+                <div>2. Describe your service project or needs</div>
+                <div>3. Optionally specify labor hours for tasks</div>
+                <div>4. Click stop to generate estimate</div>
+                <div>5. Edit, save, or copy the result</div>
               </div>
+            </div>
             </div>
           </div>
 
@@ -562,7 +571,9 @@ const PrototypeEstimator = () => {
                 ) : (
                   <div className="w-full h-96 p-4 bg-slate-900/50 border border-white/20 rounded-lg text-white/90 font-mono text-sm overflow-auto">
                     {estimate ? (
-                      <pre className="whitespace-pre-wrap">{estimate}</pre>
+                      <pre className="whitespace-pre-wrap">
+                        {typeof estimate === 'string' ? estimate : JSON.stringify(estimate, null, 2)}
+                      </pre>
                     ) : (
                       <div className="flex items-center justify-center h-full text-white/50">
                         Record audio to generate an estimate
@@ -582,15 +593,15 @@ const PrototypeEstimator = () => {
             <div className="text-white/60 text-xs space-y-2">
               <div><strong>Single Items (AI estimates labor):</strong></div>
               <div>&ldquo;I need a 100 foot cedar privacy fence with one gate&rdquo;</div>
-              <div>&ldquo;Install 50 linear feet of fencing with posts and concrete&rdquo;</div>
+              <div>&ldquo;Install 6 GFCI outlets in the bathroom and kitchen&rdquo;</div>
               
               <div className="pt-2"><strong>With Specific Labor Hours:</strong></div>
-              <div>&ldquo;Install 50 feet of fencing, post digging will take 8 hours&rdquo;</div>
-              <div>&ldquo;Cedar fence installation, 6 hours for panel work and 4 hours for concrete&rdquo;</div>
+              <div>&ldquo;Install cedar fence posts, digging will take 8 hours&rdquo;</div>
+              <div>&ldquo;Electrical panel upgrade, 4 hours for panel work and 2 hours for testing&rdquo;</div>
               
               <div className="pt-2"><strong>Multiple Items Together:</strong></div>
-              <div>&ldquo;I need 80 feet of cedar privacy fence, 6 cedar posts, 10 concrete bags, gate hardware, and staining for the whole project&rdquo;</div>
-              <div>&ldquo;I need 150 feet of 12/2 Romex, 8 standard outlets, 4 single-pole switches, 6 LED recessed lights, 6 hours of rough-in wiring, and a permit fee for the project.&rdquo;</div>
+              <div>&ldquo;I need 80 feet of cedar privacy fence, 6 posts, 10 concrete bags, gate hardware, and staining for the whole project&rdquo;</div>
+              <div>&ldquo;I need 150 feet of 12/2 Romex, 8 standard outlets, 4 single-pole switches, 6 LED recessed lights, 6 hours of rough-in wiring, and a permit fee&rdquo;</div>
               
               <div className="pt-2"><strong>Multiple Recordings:</strong></div>
               <div>Record each part separately and they&rsquo;ll be added below each other</div>
