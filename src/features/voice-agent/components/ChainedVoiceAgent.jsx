@@ -16,6 +16,8 @@ const ChainedVoiceAgent = ({ onStatusChange }) => {
   const [sessionId, setSessionId] = useState(null);
   const [userInfo, setUserInfo] = useState({ name: null, email: null, collected: false });
   const [conversationCount, setConversationCount] = useState(0);
+  const [calendarLink, setCalendarLink] = useState(null);
+  const [appointmentDetails, setAppointmentDetails] = useState(null);
 
   // Refs for media handling
   const mediaRecorderRef = useRef(null);
@@ -51,6 +53,10 @@ const ChainedVoiceAgent = ({ onStatusChange }) => {
       // Create session ID
       const newSessionId = `session-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`;
       setSessionId(newSessionId);
+      setUserInfo({ name: null, email: null, collected: false });
+      setConversationCount(0);
+      setCalendarLink(null);
+      setAppointmentDetails(null);
       
       console.log('✅ Session started:', newSessionId);
 
@@ -215,6 +221,12 @@ const ChainedVoiceAgent = ({ onStatusChange }) => {
       // Update user info if collected
       if (processData.userInfo) {
         setUserInfo(processData.userInfo);
+      }
+
+      // Update calendar link if appointment was created
+      if (processData.calendarLink) {
+        setCalendarLink(processData.calendarLink);
+        setAppointmentDetails(processData.appointmentDetails);
       }
 
       setConversationCount(prev => prev + 1);
@@ -413,6 +425,33 @@ const ChainedVoiceAgent = ({ onStatusChange }) => {
             <div className="text-white/80 text-xs">
               Exchanges: {conversationCount}
             </div>
+          </div>
+        </div>
+      )}
+
+      {/* Calendar Link */}
+      {calendarLink && appointmentDetails && (
+        <div className="text-center">
+          <div className="inline-block bg-gradient-to-r from-emerald-500/20 to-blue-500/20 backdrop-blur-sm rounded-xl border border-emerald-500/30 p-4 max-w-sm">
+            <div className="flex items-center justify-center mb-2">
+              <svg className="w-5 h-5 text-emerald-400 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z" />
+              </svg>
+              <div className="text-emerald-400 text-sm font-semibold">Appointment Scheduled!</div>
+            </div>
+            
+            <div className="text-white/90 text-xs mb-3 space-y-1">
+              <div><strong>Service:</strong> {appointmentDetails.title}</div>
+              <div><strong>Date:</strong> {appointmentDetails.date}</div>
+              <div><strong>Time:</strong> {appointmentDetails.timeDisplay}</div>
+            </div>
+            
+            <button
+              onClick={() => window.open(calendarLink, '_blank')}
+              className="w-full bg-gradient-to-r from-emerald-500 to-blue-500 hover:from-emerald-400 hover:to-blue-400 text-white font-medium py-2 px-4 rounded-lg transition-all duration-300 transform hover:scale-105 focus:outline-none focus:ring-2 focus:ring-emerald-500/50 text-sm"
+            >
+              📅 View in Calendar
+            </button>
           </div>
         </div>
       )}
