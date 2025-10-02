@@ -61,7 +61,7 @@ const ChainedVoiceAgent = ({ onStatusChange }) => {
       console.log('✅ Session started:', newSessionId);
 
       // Play initial greeting
-      const initialGreeting = "Hi! Welcome to SherpaPrompt Fencing Company. I'm here to help with your fencing needs. Please tell me your name and email address.";
+      const initialGreeting = "Hi there! Welcome to SherpaPrompt Fencing Company. I'm here to help with your fencing needs. Could you tell me your name and email address to get started?";
       
       updateStatus('Playing greeting...');
       await playTextAsAudio(initialGreeting, newSessionId);
@@ -74,7 +74,7 @@ const ChainedVoiceAgent = ({ onStatusChange }) => {
     }
   };
 
-  const stopConversation = () => {
+  const stopConversation = async () => {
     console.log('⏹️ Stopping conversation...');
     
     // Stop recording if active
@@ -86,6 +86,18 @@ const ChainedVoiceAgent = ({ onStatusChange }) => {
     if (streamRef.current) {
       streamRef.current.getTracks().forEach(track => track.stop());
       streamRef.current = null;
+    }
+
+    // Clean up session on server (this will trigger email sending)
+    if (sessionId) {
+      try {
+        await fetch(`${process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3001'}/api/chained-voice/session/${sessionId}`, {
+          method: 'DELETE'
+        });
+        console.log('✅ Session cleanup requested for:', sessionId);
+      } catch (error) {
+        console.error('❌ Failed to cleanup session:', error);
+      }
     }
 
     // Reset state
