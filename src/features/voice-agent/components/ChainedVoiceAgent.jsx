@@ -61,7 +61,7 @@ const ChainedVoiceAgent = ({ onStatusChange }) => {
       console.log('✅ Session started:', newSessionId);
 
       // Play initial greeting
-      const initialGreeting = "Hi! Welcome to SherpaPrompt Fencing Company. I'm here to help with your fencing needs. Please tell me your name and email address.";
+      const initialGreeting = "Hi there! Welcome to SherpaPrompt Fencing Company. I'm here to help with your fencing needs. Could you tell me your name and email address to get started?";
       
       updateStatus('Playing greeting...');
       await playTextAsAudio(initialGreeting, newSessionId);
