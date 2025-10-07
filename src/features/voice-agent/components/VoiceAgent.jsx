@@ -32,7 +32,7 @@ const VoiceAgent = () => {
         {/* Title */}
         <div className="text-center mb-8">
           <h1 className="text-3xl font-bold text-white mb-2">
-            After Hours Call Agent
+            Call Agent
           </h1>
           <p className="text-white/60 text-sm">
             AI-powered Voice Assistant
