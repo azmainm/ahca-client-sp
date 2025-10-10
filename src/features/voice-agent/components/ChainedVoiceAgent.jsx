@@ -462,6 +462,13 @@ const ChainedVoiceAgent = ({ onStatusChange }) => {
 
       setConversationCount(prev => prev + 1);
 
+      // Play filler phrase first if available
+      if (processData.fillerPhrase) {
+        console.log('🔊 [VAD] Playing filler phrase:', processData.fillerPhrase);
+        updateStatus('Processing...');
+        await playTextAsAudio(processData.fillerPhrase, sessionId);
+      }
+
       // Step 4: Convert to speech with TTS
       updateStatus('Converting to speech...');
       const synthesisResponse = await fetch(`${process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3001'}/api/chained-voice/synthesize`, {

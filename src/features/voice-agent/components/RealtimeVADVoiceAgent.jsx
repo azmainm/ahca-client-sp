@@ -323,6 +323,14 @@ const RealtimeVADVoiceAgent = ({ onStatusChange }) => {
               setConversationCount(responseData.conversationCount);
             }
             
+            // Play filler phrase first if available
+            if (responseData.fillerPhrase) {
+              console.log('🔊 [RealtimeVAD] Playing filler phrase:', responseData.fillerPhrase);
+              setIsProcessing(true);
+              updateStatus('Processing...');
+              await playTextAsAudio(responseData.fillerPhrase, sessionId);
+            }
+            
             // Play the response audio
             setIsProcessing(true);
             updateStatus('AI responding...');
