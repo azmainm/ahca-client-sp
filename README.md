@@ -11,6 +11,10 @@ The After Hours Call Agent client is a React/Next.js web application that provid
 - **Automatic Speech Detection**: Uses OpenAI Realtime API for server-side VAD
 - **Natural Conversation Flow**: 2.5-second silence detection for natural pauses
 - **Visual Feedback**: Real-time status indicators for listening, speaking, and processing states
+- **Contextual Filler Phrases**: Immediate audio feedback while processing
+  - Plays appropriate phrases based on your request type
+  - Reduces perceived wait time during AI processing
+  - Provides natural conversation flow with instant acknowledgment
 
 ## Architecture
 
