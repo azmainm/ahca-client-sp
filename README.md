@@ -1,8 +1,14 @@
-# After Hours Call Agent (AHCA) - Voice AI Client with VAD
+# SherpaPrompt Voice AI Client with VAD
 
 ## Overview
 
-The After Hours Call Agent client is a React/Next.js web application that provides a natural voice interface with **automatic Voice Activity Detection (VAD)**. Users can have hands-free conversations with the AI assistant without needing to press any buttons - just speak naturally and the system automatically detects when you start and stop talking.
+The SherpaPrompt client is a React/Next.js web application that provides a natural voice interface with **automatic Voice Activity Detection (VAD)**. Users can have hands-free conversations with the AI assistant to learn about SherpaPrompt's automation services, schedule demos, and get support - just speak naturally and the system automatically detects when you start and stop talking.
+
+**SherpaPrompt** turns conversations into outcomes through four core automation services:
+- **Call Service Automation** - AI agents that handle customer calls and qualify leads
+- **Transcript to Task** - Extract action items from meetings and create tasks
+- **Voice to Estimate** - Create detailed estimates through voice commands
+- **SherpaPrompt App** - Prompt orchestration and management platform
 
 ## 🎤 Voice Activity Detection (VAD) Features
 
@@ -39,7 +45,7 @@ MediaRecorder → Base64 → RealtimeVADService → GPT-5-nano → TTS → HTML5
 ### Prerequisites
 - Node.js 18+ installed
 - Modern web browser with microphone support
-- Backend server running (ahca-server)
+- SherpaPrompt Voice Agent backend server running (ahca-server)
 
 ### Installation & Setup
 ```bash
@@ -50,13 +56,27 @@ npm install
 npm run dev
 ```
 
-### Using the VAD Voice Agent
+### Using the SherpaPrompt Voice Agent
 1. Open http://localhost:3000 in your browser
 2. Click the purple "Start Conversation" button
 3. **Allow microphone access** when prompted by browser
 4. Start speaking naturally - no buttons to press!
 5. The system will automatically detect when you start and stop talking
-6. Wait for the AI response and continue the conversation
+6. Ask about SherpaPrompt's automation services, request demos, or get support
+7. Wait for the AI response and continue the conversation
+
+### Example Conversations
+- "What does SherpaPrompt do?"
+- "How does call automation work?"
+- "Can I schedule a demo?"
+- "What are your pricing tiers?"
+- "Tell me about integrations"
+
+## 📚 Complete System Documentation
+
+For comprehensive documentation of the entire SherpaPrompt Voice Agent System including backend architecture, API endpoints, and deployment guides, see:
+
+**[📖 SherpaPrompt Voice Agent System Documentation](../ahca-server/docs/SHERPAPROMPT_VOICE_AGENT_SYSTEM.md)**
 
 ## Frontend (ahca-client) - Detailed Implementation
 
@@ -158,7 +178,7 @@ Response: {
 - **Listening**: Animated pulse rings, "Listening... (speak naturally)"  
 - **Speaking**: Blue accent, "Speaking detected..."
 - **Processing**: Loading state, "Processing your request..."
-- **Responding**: Green accent, "AI is responding..."
+- **Responding**: Green accent, "SherpaPrompt AI is responding..."
 
 **User Information Display:**
 ```javascript
