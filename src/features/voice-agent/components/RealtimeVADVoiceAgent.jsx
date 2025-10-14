@@ -590,7 +590,7 @@ const RealtimeVADVoiceAgent = ({ onStatusChange }) => {
             <p>Connected: {vadStatus.isConnected ? '✅' : '❌'}</p>
             <p>Mode: Server VAD</p>
             <p>Speaking: {isSpeaking ? '🟢' : '⚪'}</p>
-            <p>Silence: 2.5s threshold</p>
+            <p>Silence: 1.5s threshold</p>
             {vadStatus.speechDuration > 0 && (
               <p>Duration: {Math.round(vadStatus.speechDuration / 1000)}s</p>
             )}
