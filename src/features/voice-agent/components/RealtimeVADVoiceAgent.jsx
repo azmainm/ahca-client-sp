@@ -81,7 +81,7 @@ const RealtimeVADVoiceAgent = ({ onStatusChange }) => {
       console.log('✅ [RealtimeVAD] Session started:', newSessionId);
 
       // Play initial greeting using existing TTS
-      const initialGreeting = "Hi there, this is Scout, SherpaPrompt's virtual assistant. Parts of this call may be recorded so we can better understand your needs and improve our service. Who am I speaking with and how can I help you today?";
+      const initialGreeting = "Hi there, this is Scout, SherpaPrompt's virtual assistant. Parts of this call may be recorded so we can better understand your needs and improve our service. Who am I speaking with?";
 
       updateStatus('Playing greeting...');
       await playTextAsAudio(initialGreeting, newSessionId);
