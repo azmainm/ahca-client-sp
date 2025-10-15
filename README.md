@@ -16,6 +16,11 @@ The SherpaPrompt client is a React/Next.js web application that provides a natur
 - **Real-Time Audio Streaming**: Continuous microphone capture and processing  
 - **Automatic Speech Detection**: Uses OpenAI Realtime API for server-side VAD
 - **Natural Conversation Flow**: 2.5-second silence detection for natural pauses
+- **Intelligent Interruption Handling**: Seamlessly handles user interruptions
+  - Client-side barge-in stops current audio playback
+  - Server processes only the latest user input
+  - Prevents multiple overlapping responses
+  - Natural conversation flow even when interrupting
 - **Visual Feedback**: Real-time status indicators for listening, speaking, and processing states
 - **Contextual Filler Phrases**: Immediate audio feedback while processing
   - Plays appropriate phrases based on your request type
@@ -282,6 +287,30 @@ Enable detailed client-side logging by checking browser console:
 🔊 [RealtimeVAD] Playing response audio: 45231 bytes
 ```
 
+## Latest Enhancements (October 2025)
+
+### ✅ Intelligent Interruption Handling
+The client now seamlessly handles user interruptions with a dual-layer approach:
+
+**Client-Side Barge-In:**
+- Detects when user starts speaking (from server VAD status)
+- Immediately pauses and discards current AI audio playback
+- Provides instant feedback by stopping mid-response
+
+**Server-Side Smart Processing:**
+- Queues new transcriptions when already processing
+- Uses only the most recent user input after interruption
+- Prevents multiple overlapping responses
+- Ensures single, relevant response to latest user query
+
+**Result:** Natural conversation flow where interrupting works like real human interaction - the system stops talking and listens to your latest input.
+
+### ✅ Enhanced User Experience
+- **Smart Name Setting**: Natural responses when collecting user information
+- **No Redundant Messages**: Eliminates "updated from X to X" confusion
+- **Seamless Flow**: Interruptions feel natural, not jarring
+- **Single Response**: Always get one relevant response, never multiple overlapping ones
+
 ## Deployment Considerations
 
 ### Environment Variables
@@ -300,6 +329,7 @@ npm start
 # - Minified JavaScript bundles
 # - Optimized audio processing
 # - Efficient polling intervals
+# - Robust interruption handling
 ```
 
 ### HTTPS Requirements
