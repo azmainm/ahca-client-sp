@@ -31,6 +31,7 @@ const RealtimeVADVoiceAgent = ({ onStatusChange }) => {
   const vadIntervalRef = useRef(null);
   const statusIntervalRef = useRef(null);
   const responseIntervalRef = useRef(null);
+  const currentAudioRef = useRef(null); // Track currently playing audio for interruption
 
   // Realtime VAD configuration
   const VAD_CONFIG = {
@@ -287,6 +288,15 @@ const RealtimeVADVoiceAgent = ({ onStatusChange }) => {
           if (statusData.hasSpeech !== isSpeaking) {
             setIsSpeaking(statusData.hasSpeech);
             console.log('🎤 [RealtimeVAD] Speaking state changed:', statusData.hasSpeech);
+            
+            // If user starts speaking while agent is playing audio, interrupt it (barge-in)
+            if (statusData.hasSpeech && currentAudioRef.current) {
+              console.log('🛑 [Barge-in] User started speaking - interrupting agent audio');
+              currentAudioRef.current.pause();
+              currentAudioRef.current = null;
+              setIsProcessing(false);
+              updateStatus('Listening... (interrupted)');
+            }
           }
         }
       } catch (error) {
@@ -464,17 +474,29 @@ const RealtimeVADVoiceAgent = ({ onStatusChange }) => {
   const playAudio = (audioBase64) => {
     return new Promise((resolve, reject) => {
       try {
+        // Stop any currently playing audio (interruption)
+        if (currentAudioRef.current) {
+          console.log('🛑 [Interruption] Stopping current audio playback');
+          currentAudioRef.current.pause();
+          currentAudioRef.current = null;
+        }
+
         const audioBlob = new Blob([Uint8Array.from(atob(audioBase64), c => c.charCodeAt(0))], { type: 'audio/mp3' });
         const audioUrl = URL.createObjectURL(audioBlob);
         const audio = new Audio(audioUrl);
 
+        // Track current audio element
+        currentAudioRef.current = audio;
+
         audio.onended = () => {
           URL.revokeObjectURL(audioUrl);
+          currentAudioRef.current = null;
           resolve();
         };
 
         audio.onerror = (error) => {
           URL.revokeObjectURL(audioUrl);
+          currentAudioRef.current = null;
           reject(error);
         };
 
