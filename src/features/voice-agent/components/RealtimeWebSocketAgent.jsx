@@ -476,23 +476,6 @@ const RealtimeWebSocketAgent = ({ onStatusChange }) => {
             <p className="text-white/60 text-sm mt-1">{currentStatus}</p>
           </div>
 
-          {/* Transcript Display */}
-          {(userTranscript || aiTranscript) && (
-            <div className="w-full max-w-md bg-white/5 backdrop-blur-sm rounded-xl border border-white/10 p-4">
-              {userTranscript && (
-                <div className="mb-2">
-                  <p className="text-green-400 text-xs font-semibold mb-1">You:</p>
-                  <p className="text-white/80 text-sm">{userTranscript}</p>
-                </div>
-              )}
-              {aiTranscript && (
-                <div>
-                  <p className="text-blue-400 text-xs font-semibold mb-1">AI:</p>
-                  <p className="text-white/80 text-sm">{aiTranscript}</p>
-                </div>
-              )}
-            </div>
-          )}
 
           {/* Debug Info */}
           <div className="inline-block bg-white/5 backdrop-blur-sm rounded-xl border border-white/10 px-4 py-2 text-xs text-white/70">
