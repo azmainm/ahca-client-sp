@@ -29,6 +29,7 @@ const RealtimeWebSocketAgent = ({ onStatusChange }) => {
   const audioContextRef = useRef(null);
   const audioQueueRef = useRef([]);
   const isPlayingRef = useRef(false);
+  const currentAudioSourceRef = useRef(null);  // Track currently playing audio
 
   // Configuration
   const WS_URL = process.env.NEXT_PUBLIC_API_URL 
@@ -129,10 +130,10 @@ const RealtimeWebSocketAgent = ({ onStatusChange }) => {
         updateStatus('Listening...');
         
         // Cancel any ongoing AI response (interruption)
+        // Server will send response.cancel to OpenAI
         if (isAIResponding) {
           console.log('🛑 [RealtimeWS] Interrupting AI response');
           stopAudioPlayback();
-          wsRef.current?.send(JSON.stringify({ type: 'response.cancel' }));
         }
         break;
 
@@ -305,7 +306,11 @@ const RealtimeWebSocketAgent = ({ onStatusChange }) => {
       source.buffer = audioBuffer;
       source.connect(audioContext.destination);
       
+      // Store reference to current audio source
+      currentAudioSourceRef.current = source;
+      
       source.onended = () => {
+        currentAudioSourceRef.current = null;
         // Play next chunk
         playNextAudioChunk();
       };
@@ -323,17 +328,23 @@ const RealtimeWebSocketAgent = ({ onStatusChange }) => {
    * Stop audio playback (for interruptions)
    */
   const stopAudioPlayback = () => {
+    console.log('🛑 [RealtimeWS] Stopping audio playback');
+    
+    // Stop currently playing audio immediately
+    if (currentAudioSourceRef.current) {
+      try {
+        currentAudioSourceRef.current.stop();
+        currentAudioSourceRef.current = null;
+      } catch (e) {
+        // Already stopped
+      }
+    }
+    
     // Clear audio queue
     audioQueueRef.current = [];
     isPlayingRef.current = false;
-    
-    // Stop audio context
-    if (audioContextRef.current?.state === 'running') {
-      audioContextRef.current.suspend();
-      setTimeout(() => {
-        audioContextRef.current?.resume();
-      }, 100);
-    }
+    setIsAIResponding(false);
+    setAITranscript('');
   };
 
   /**
