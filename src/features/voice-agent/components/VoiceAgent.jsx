@@ -1,7 +1,7 @@
 'use client';
 
 import { useState } from 'react';
-import RealtimeVADVoiceAgent from './RealtimeVADVoiceAgent';
+import RealtimeWebSocketAgent from './RealtimeWebSocketAgent';
 
 const VoiceAgent = () => {
   const [currentStatus, setCurrentStatus] = useState('Ready to start conversation');
@@ -40,8 +40,8 @@ const VoiceAgent = () => {
         </div>
         
 
-        {/* Main Interface - Realtime VAD Voice Agent */}
-        <RealtimeVADVoiceAgent onStatusChange={handleChainedStatusChange} />
+        {/* Main Interface - Realtime WebSocket Agent */}
+        <RealtimeWebSocketAgent onStatusChange={handleChainedStatusChange} />
 
         {/* Features List */}
         <div className="mt-16 text-center">
