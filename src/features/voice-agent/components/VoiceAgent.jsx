@@ -5,6 +5,7 @@ import RealtimeWebSocketAgent from './RealtimeWebSocketAgent';
 
 const VoiceAgent = () => {
   const [currentStatus, setCurrentStatus] = useState('Ready to start conversation');
+  const [selectedBusiness, setSelectedBusiness] = useState('sherpaprompt');
 
   const handleChainedStatusChange = (chainedStatus) => {
     setCurrentStatus(chainedStatus);
@@ -13,6 +14,40 @@ const VoiceAgent = () => {
   const handleEstimatorClick = () => {
     window.open('/prototype-estimator', '_blank');
   };
+
+  const handleBusinessToggle = (businessId) => {
+    setSelectedBusiness(businessId);
+  };
+
+  // Business configurations
+  const businessConfigs = {
+    sherpaprompt: {
+      name: 'SherpaPrompt',
+      tagline: 'Conversations into Outcomes',
+      agent: 'Scout',
+      color: 'purple',
+      services: [
+        { name: 'Call Automation', color: 'blue' },
+        { name: 'Transcript to Task', color: 'emerald' },
+        { name: 'Voice to Estimate', color: 'orange' },
+        { name: 'App Platform', color: 'purple' }
+      ]
+    },
+    'superior-fencing': {
+      name: 'Superior Fence & Construction',
+      tagline: 'Professional Fencing Services',
+      agent: 'Mason',
+      color: 'emerald',
+      services: [
+        { name: 'New Installation', color: 'blue' },
+        { name: 'Fence Repair', color: 'emerald' },
+        { name: 'Gate Services', color: 'orange' },
+        { name: 'Emergency Service', color: 'red' }
+      ]
+    }
+  };
+
+  const currentConfig = businessConfigs[selectedBusiness];
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-slate-900 via-slate-800 to-gray-900 flex items-center justify-center p-4 relative">
@@ -29,41 +64,63 @@ const VoiceAgent = () => {
 
       <div className="w-full max-w-md mx-auto">
         
+        {/* Business Toggle */}
+        <div className="text-center mb-6">
+          <div className="inline-flex bg-white/10 backdrop-blur-sm rounded-lg p-1 border border-white/20">
+            <button
+              onClick={() => handleBusinessToggle('sherpaprompt')}
+              className={`px-4 py-2 rounded-md text-sm font-medium transition-all duration-200 ${
+                selectedBusiness === 'sherpaprompt'
+                  ? 'bg-purple-600 text-white shadow-lg'
+                  : 'text-white/70 hover:text-white hover:bg-white/10'
+              }`}
+            >
+              SherpaPrompt
+            </button>
+            <button
+              onClick={() => handleBusinessToggle('superior-fencing')}
+              className={`px-4 py-2 rounded-md text-sm font-medium transition-all duration-200 ${
+                selectedBusiness === 'superior-fencing'
+                  ? 'bg-emerald-600 text-white shadow-lg'
+                  : 'text-white/70 hover:text-white hover:bg-white/10'
+              }`}
+            >
+              Superior Fencing
+            </button>
+          </div>
+        </div>
+
         {/* Title */}
         <div className="text-center mb-8">
           <h1 className="text-3xl font-bold text-white mb-2">
-            SherpaPrompt
+            {currentConfig.name}
           </h1>
           <p className="text-white/60 text-sm">
-            Conversations into Outcomes
+            {currentConfig.tagline}
+          </p>
+          <p className="text-white/40 text-xs mt-1">
+            AI Agent: {currentConfig.agent}
           </p>
         </div>
         
 
         {/* Main Interface - Realtime WebSocket Agent */}
-        <RealtimeWebSocketAgent onStatusChange={handleChainedStatusChange} />
+        <RealtimeWebSocketAgent 
+          onStatusChange={handleChainedStatusChange} 
+          selectedBusiness={selectedBusiness}
+        />
 
         {/* Features List */}
         <div className="mt-16 text-center">
           <div className="inline-block bg-white/5 backdrop-blur-sm rounded-2xl border border-white/10 p-6">
-            <h3 className="text-white/90 text-sm font-semibold mb-3">SherpaPrompt Services</h3>
+            <h3 className="text-white/90 text-sm font-semibold mb-3">{currentConfig.name} Services</h3>
             <div className="grid grid-cols-2 gap-3 text-white/60 text-xs">
-              <div className="flex items-center space-x-2">
-                <div className="w-1.5 h-1.5 bg-blue-400 rounded-full"></div>
-                <span>Call Automation</span>
-              </div>
-              <div className="flex items-center space-x-2">
-                <div className="w-1.5 h-1.5 bg-emerald-400 rounded-full"></div>
-                <span>Transcript to Task</span>
-              </div>
-              <div className="flex items-center space-x-2">
-                <div className="w-1.5 h-1.5 bg-orange-400 rounded-full"></div>
-                <span>Voice to Estimate</span>
-              </div>
-              <div className="flex items-center space-x-2">
-                <div className="w-1.5 h-1.5 bg-purple-400 rounded-full"></div>
-                <span>App Platform</span>
-              </div>
+              {currentConfig.services.map((service, index) => (
+                <div key={index} className="flex items-center space-x-2">
+                  <div className={`w-1.5 h-1.5 bg-${service.color}-400 rounded-full`}></div>
+                  <span>{service.name}</span>
+                </div>
+              ))}
             </div>
           </div>
         </div>
