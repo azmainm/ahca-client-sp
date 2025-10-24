@@ -6,7 +6,7 @@ import { useState, useRef, useEffect } from 'react';
  * RealtimeWebSocketAgent - Direct OpenAI Realtime API integration via WebSocket
  * Replaces STT-TTS+VAD architecture with real-time bidirectional audio streaming
  */
-const RealtimeWebSocketAgent = ({ onStatusChange }) => {
+const RealtimeWebSocketAgent = ({ onStatusChange, selectedBusiness }) => {
   // Core state
   const [isConnected, setIsConnected] = useState(false);
   const [currentStatus, setCurrentStatus] = useState('Ready to start conversation');
@@ -71,8 +71,10 @@ const RealtimeWebSocketAgent = ({ onStatusChange }) => {
         sampleRate: 24000
       });
 
-      // Connect to WebSocket server
-      const ws = new WebSocket(WS_URL);
+      // Connect to WebSocket server with business ID
+      const wsUrlWithBusiness = `${WS_URL}?businessId=${selectedBusiness || 'sherpaprompt'}`;
+      console.log('🔗 [RealtimeWS] Connecting with business:', selectedBusiness || 'sherpaprompt');
+      const ws = new WebSocket(wsUrlWithBusiness);
       wsRef.current = ws;
 
       ws.onopen = () => {
